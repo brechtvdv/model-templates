@@ -4,7 +4,7 @@ This repository provides an explanation of the "templates" model, used for the L
 
 We will explain how the model works with the IRG (interactieve reglementen generator) workflow as guideline.
 
-# Level 0: Defining a concept
+# Defining a concept
 
 ## Link with vocabulary term
 
@@ -29,8 +29,9 @@ ex:Shape#Verkeersteken.plaatsbepaling a PropertyShape;
   sh:path ( oslo:plaatsbepaling ) ;
   ex:targetCanHaveConcept ex:LocationAtStreetConcept .
   
- ex:LocationAtStreetConceptA a ex:Concept, ex:LocationAtStreetConcept ;
+ ex:LocationAtStreetConcept a ex:Concept ;
   ex:template [
+    a ex:Template ;
     ex:value "ter hoogte van ${straat}" ;
     ex:mapping [
       ex:variable "straat" ;
@@ -47,55 +48,117 @@ ex:Shape#Verkeersteken.plaatsbepaling a PropertyShape;
 
 ###  Class
 
-We can create a concept for a certain class.
+We want to create a concept for the class "Verkeersteken".
 For example, we want to define a concept "E9a" of a traffic sign that explains that parking is allowed.
 Similar to above, we use SHACL to indicate the term in the model that want to provide a concept for.
 
 ```turtle
-ex:Shape#Verkeersteken a NodeShape;
+ex:Shape#Verkeersteken a sh:NodeShape;
   sh:targetClass oslo:Verkeersteken ;
-  ex:targetCanHaveConcept ex:VerkeerstekenConcept , ex:E9aConcept .
+  oslo:heeftVerkeersbordconcept ex:VerkeerstekenConcept ; # how it is done in OSLO
+  ex:targetCanHaveConcept ex:VerkeerstekenConcept . # how we generalize this
 
-# In general
-ex:VerkeerstekenConcept a ex:Concept ;
+# General description how Verkeersteken can be described
+ex:VerkeerstekenConcept a oslo:Verkeersbordconcept, ex:Concept ;
   ex:template [
+    a ex:Template ;
     ex:value "${wegcode}" ;
     ex:mapping [
       ex:variable "wegcode" ;
       ex:expects [
         a sh:PropertyShape ;
-        sh:targetClass ex:VerkeerstekenConcept ;
-        sh:path ( ex:wegcode ) ;
+        sh:targetClass oslo:Verkeersbordconcept ;
+        sh:path ( ex:beschrijving ) ;
         sh:maxCount 1 ;
         sh:datatype xsd:string 
       ]
     ]
   ] .
 
-# Create instantiated concepts
-ex:E9aConcept a ex:VerkeerConcept ;
-  ex:wegcode "Parking is allowed." .
+ex:E9aVerkeersbordconcept a oslo:Verkeersbordconcept ;
+  ex:beschrijving "Parking is allowed." .
+  
+# When your model hasn't modelled concepts
+ex:Shape#Verkeersteken a sh:NodeShape;
+  sh:targetClass oslo:Verkeersteken ;
+  ex:targetCanHaveConcept ex:E9aVerkeerstekenconcept .
+  
+ex:E9aVerkeerstekenconcept a ex:Concept ;
   ex:template [
-    ex:value "Parking is allowed.";
+    a ex:Template ;
+    ex:value "Parking is allowed" 
   ] .
 ```
 
-This also works when E9aConcept already has been defined as a subclass of Verkeersteken:
+This also works when the concept of E9a already has been defined as a subclass of Verkeersteken by using `sh:targetNode` instead of `sh:targetClass`:
 
 ```turtle
-ex:Shape#Verkeersteken a NodeShape;
-  sh:targetNode oslo:VerkeerstekenE9a ;
+ex:E9aVerkeersbordconcept rdfs:subClassOf oslo:Verkeersbordconcept ;
+
+ex:Shape#Verkeersteken a NodeShape ;
+  sh:targetNode oslo:E9aVerkeersbordconcept ;
   ex:targetCanHaveConcept ex:E9aConcept .
 ```
 
-# Link with other concepts
+## Link with other concepts
 
-Our LocationAtStreetConcept can be useful with another concept, such as traffic sign E9a (E9aConcept).
+Our LocationAtStreetConcept can be useful with another concept, such as traffic sign E9a (E9aVerkeerstekenconcept).
 A relation describes how two concepts relate with eachother.
 In this case, we want to express that LocationAtStreetConcept can be used with E9aConcept.
 
 ```turtle
-ex:RelationLocationAtStreetConceptAndE9a
+ex:E9aVerkeerstekenconcept a ex:Concept ;
+  ex:relation [
+    a ex:CanBeCombinedWithRelation ;
+    ex:concept ex:LocationAtStreetConcept 
+  ], [
+    a ex:CanBeCombinedWithRelation ;
+    ex:concept ex:XcConcept 
+  ]
 ```
 
+A second relation is added to express that bottom plate "Xc" can be used with E9a.
+
+# Reusable templates
+
+To create a template that works for multiple concepts, we need the template to be dependant of the concept it is linked with it.
+
+Let's create a template for Traffic Measurement that has two variables: a location and a traffic sign.
+
+```turtle
+ex:TrafficMeasurementTemplate a ex:Template ;
+  ex:value "${location}\n${trafficsign}";
+  ex:mapping [
+    ex:variable "location" ;
+    ex:expects [
+      a sh:PropertyShape ;
+        sh:targetClass oslo:Verkeersteken ;
+        sh:path ( oslo:plaatsbepaling ) ;
+        sh:maxCount 3 ;
+    ], [
+    ex:variable "trafficsign" ;
+    ex:expects [
+      a sh:PropertyShape ;
+        sh:targetClass oslo:Verkeersteken ;
+        sh:maxCount 1 ;
+    ]
+  ] .
+```
+
+When creating a specific traffic measurement E9a+Xc concept:
+
+```turtle
+ex:E9a+XcMeasurementConcept a ex:Concept ;
+  ex:template ex:TrafficMeasurementTemplate ;
+  ex:relation [
+    a ex:CanBeCombinedWithRelation ;
+    ex:concept ex:LocationAtStreetConcept .
+  ], [
+    a ex:MustUseRelation ;
+    ex:concept ex:E9aVerkeerstekenconcept .
+  ], [
+    a ex:MustUseRelation ;
+    ex:concept ex:XcVerkeerstekenconcept .
+  ]
+```
 
