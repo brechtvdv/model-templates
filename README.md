@@ -4,11 +4,25 @@ This repository provides an explanation of the "templates" model, used for the L
 
 We will explain how the model works with the IRG (interactieve reglementen generator) workflow as guideline.
 
+# Overview
+
+<img src="https://github.com/brechtvdv/model-templates/blob/main/mainv2.jpg" width="700" height="350">
+
+The model composes four parts:
+
+1) Shapes allow to select a property (PropertyShape:targetClass+path), a class (NodeShape:targetClass), or instance (NodeShape:targetNode).
+
+2) Concept allow to express what is targetted with the shape. For example: the location of a traffic sign (=target of your shape) can be expressed in different ways (=concepts), such as that the traffic sign is located near a house number.
+
+3) A concept must have at least one template, which is a textual description of what you want to express. A template can have variables and mappings for those variables. A mapping can indicate with a shape what it expects. This way, concepts that match with this shape can be suggested. 
+
+4) Concepts have relations with other concepts. For example, a traffic sign can be related with another traffic sign, or a certain type of decision requires the use of certain articles.
+
 # Defining a concept
 
 ## Link with vocabulary term
 
-A concept describes how a certain class or property (of your ontology or application profile) can be represented.
+A concept describes how a certain class or property (of your ontology or application profile), or instance can be represented.
 
 ### Property
 
@@ -27,7 +41,7 @@ In Turtle (RDF) we can describe this as follows:
 ex:Shape#Verkeersteken.plaatsbepaling a PropertyShape;
   sh:targetClass oslo:Verkeersteken ;
   sh:path ( oslo:plaatsbepaling ) ;
-  ex:targetCanHaveConcept ex:LocationAtStreetConcept .
+  ex:targetHasConcept ex:LocationAtStreetConcept .
   
  ex:LocationAtStreetConcept a ex:Concept ;
   ex:template [
@@ -56,7 +70,7 @@ Similar to above, we use SHACL to indicate the term in the model that want to pr
 ex:Shape#Verkeersteken a sh:NodeShape;
   sh:targetClass oslo:Verkeersteken ;
   oslo:heeftVerkeersbordconcept ex:VerkeerstekenConcept ; # how it is done in OSLO
-  ex:targetCanHaveConcept ex:VerkeerstekenConcept . # how we generalize this
+  ex:targetHasConcept ex:VerkeerstekenConcept . # how we generalize this
 
 # General description how Verkeersteken can be described
 ex:VerkeerstekenConcept a oslo:Verkeersbordconcept, ex:Concept ;
@@ -81,7 +95,7 @@ ex:E9aVerkeersbordconcept a oslo:Verkeersbordconcept ;
 # When your model hasn't modelled concepts
 ex:Shape#Verkeersteken a sh:NodeShape;
   sh:targetClass oslo:Verkeersteken ;
-  ex:targetCanHaveConcept ex:E9aVerkeerstekenconcept .
+  ex:targetHasConcept ex:E9aVerkeerstekenconcept .
   
 ex:E9aVerkeerstekenconcept a ex:Concept ;
   ex:template [
@@ -97,7 +111,7 @@ ex:E9aVerkeersbordconcept rdfs:subClassOf oslo:Verkeersbordconcept ;
 
 ex:Shape#Verkeersteken a NodeShape ;
   sh:targetNode oslo:E9aVerkeersbordconcept ;
-  ex:targetCanHaveConcept ex:E9aConcept .
+  ex:targetHasConcept ex:E9aConcept .
 ```
 
 ## Link with other concepts
@@ -121,12 +135,19 @@ A second relation is added to express that bottom plate "Xc" can be used with E9
 
 # Reusable templates
 
-To create a template that works for multiple concepts, we need the template to be dependant of the concept it is linked with it.
+To create a template that works for multiple concepts, the variables in the template neeed to be dependant of the concept the template is used for.
 
-Let's create a template for Traffic Measurement that has two variables: a location and a traffic sign.
+Let's create a template for all Traffic Measures, which has two variables: a location and a traffic sign.
 
 ```turtle
-ex:TrafficMeasurementTemplate a ex:Template ;
+ex:Shape#TrafficMeasure a sh:NodeShape;
+  sh:targetClass oslo:Verkeersmaatregel ;
+  ex:targetHasConcept ex:TrafficMeasureConcept .
+   
+ex:TrafficMeasureConcept a ex:Concept;
+  ex:template ex:TrafficMeasureTemplate .
+  
+ex:TrafficMeasureTemplate a ex:Template ;
   ex:value "${location}\n${trafficsign}";
   ex:mapping [
     ex:variable "location" ;
@@ -134,7 +155,7 @@ ex:TrafficMeasurementTemplate a ex:Template ;
       a sh:PropertyShape ;
         sh:targetClass oslo:Verkeersteken ;
         sh:path ( oslo:plaatsbepaling ) ;
-        sh:maxCount 3 ;
+        sh:maxCount 3 ; # for example
     ], [
     ex:variable "trafficsign" ;
     ex:expects [
@@ -145,11 +166,18 @@ ex:TrafficMeasurementTemplate a ex:Template ;
   ] .
 ```
 
-When creating a specific traffic measurement E9a+Xc concept:
+Here we use shapes to indicate what is expected.
+This template depends on the traffic measure that needs to be installed.
+
+When creating a specific traffic measure E9a+Xc concept:
 
 ```turtle
-ex:E9a+XcMeasurementConcept a ex:Concept ;
-  ex:template ex:TrafficMeasurementTemplate ;
+ex:Shape#TrafficMeasure a sh:NodeShape;
+  sh:targetClass oslo:Verkeersmaatregel ;
+  ex:targetHasConcept ex:E9a+XcMeasureConcept . # or maybe call it ex:targetCanHaveConcept, because multiple concepts can serve a certain target
+  
+ex:E9a+XcMeasureConcept a ex:Concept ;
+  ex:template ex:TrafficMeasureTemplate ;
   ex:relation [
     a ex:CanBeCombinedWithRelation ;
     ex:concept ex:LocationAtStreetConcept .
@@ -161,4 +189,6 @@ ex:E9a+XcMeasurementConcept a ex:Concept ;
     ex:concept ex:XcVerkeerstekenconcept .
   ]
 ```
+
+An application (editor, GUI) now knows throught the relations, which locationconcepts and verkeerstekenconcepts can be an answer for the template variables.
 
